@@ -175,3 +175,4 @@ ifeq ($(CONFIG_MALI_T6XX),y)
     EXTRA_CFLAGS += -Idrivers/gpu/arm/t6xx
 endif
 
+CFLAGS_s3c-fb.o := -Iinclude/linux
