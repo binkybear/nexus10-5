@@ -35,7 +35,6 @@
 #include <plat/regs-fb-v4.h>
 #include <plat/fb.h>
 
-#ifdef CONFIG_ION_EXYNOS
 #include <linux/dma-buf.h>
 #include <linux/exynos_ion.h>
 #include <linux/ion.h>
@@ -46,7 +45,6 @@
 #include <plat/iovmm.h>
 #include <plat/sysmmu.h>
 #include <mach/sysmmu.h>
-#endif
 
 #ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
@@ -82,9 +80,7 @@
 
 struct s3c_fb;
 
-#ifdef CONFIG_ION_EXYNOS
 extern struct ion_device *ion_exynos;
-#endif
 
 #define VALID_BPP(x) (1 << ((x) - 1))
 
@@ -183,7 +179,6 @@ struct s3c_fb_palette {
 	struct fb_bitfield	a;
 };
 
-#ifdef CONFIG_ION_EXYNOS
 struct s3c_dma_buf_data {
 	struct ion_handle *ion_handle;
 	struct dma_buf *dma_buf;
@@ -211,7 +206,6 @@ struct s3c_reg_data {
 	u32			vidw_buf_size[S3C_FB_MAX_WIN];
 	struct s3c_dma_buf_data	dma_buf_data[S3C_FB_MAX_WIN];
 };
-#endif
 
 /**
  * struct s3c_fb_win - per window private data for each framebuffer.
@@ -234,11 +228,10 @@ struct s3c_fb_win {
 	u32			*palette_buffer;
 	u32			 pseudo_palette[16];
 	unsigned int		 index;
-#ifdef CONFIG_ION_EXYNOS
+
 	struct s3c_dma_buf_data	dma_buf_data;
 	struct fb_var_screeninfo prev_var;
 	struct fb_fix_screeninfo prev_fix;
-#endif
 
 	int			fps;
 };
@@ -305,7 +298,6 @@ struct s3c_fb {
 	int			 irq_no;
 	struct s3c_fb_vsync	 vsync_info;
 
-#ifdef CONFIG_ION_EXYNOS
 	struct ion_client	*fb_ion_client;
 
 	struct list_head	update_regs_list;
@@ -316,7 +308,6 @@ struct s3c_fb {
 
 	struct sw_sync_timeline *timeline;
 	int			timeline_max;
-#endif
 
 #ifdef CONFIG_DEBUG_FS
 	struct dentry		*debug_dentry;
@@ -1417,7 +1408,6 @@ int s3c_fb_set_vsync_int(struct fb_info *info,
 	return 0;
 }
 
-#ifdef CONFIG_ION_EXYNOS
 static unsigned int s3c_fb_map_ion_handle(struct s3c_fb *sfb,
 		struct s3c_dma_buf_data *dma, struct ion_handle *ion_handle,
 		struct dma_buf *buf)
@@ -2115,7 +2105,6 @@ static int s3c_fb_get_user_ion_handle(struct s3c_fb *sfb,
 	}
 	return 0;
 }
-#endif
 
 static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			unsigned long arg)
@@ -2198,7 +2187,6 @@ static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		ret = s3c_fb_set_vsync_int(info, p.vsync);
 		break;
 
-#ifdef CONFIG_ION_EXYNOS
 	case S3CFB_WIN_CONFIG:
 		if (copy_from_user(&p.win_data,
 				   (struct s3c_fb_win_config_data __user *)arg,
@@ -2248,7 +2236,6 @@ static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		}
 		ret = 0;
 		break;
-#endif
 
 	default:
 		ret = -ENOTTY;
@@ -2340,7 +2327,6 @@ static int __devinit s3c_fb_alloc_memory(struct s3c_fb *sfb,
 
 	dev_dbg(sfb->dev, "want %u bytes for window[%d]\n", size, win->index);
 
-#if defined(CONFIG_ION_EXYNOS)
 	handle = ion_alloc(sfb->fb_ion_client, (size_t)size, 0,
 					EXYNOS_ION_HEAP_EXYNOS_MASK, 0);
 	if (IS_ERR(handle)) {
@@ -2358,28 +2344,15 @@ static int __devinit s3c_fb_alloc_memory(struct s3c_fb *sfb,
 	if (!ret)
 		goto err_map;
 	map_dma = win->dma_buf_data.dma_addr;
-#else
-	fbi->screen_base = dma_alloc_writecombine(sfb->dev, size,
-						  &map_dma, GFP_KERNEL);
-	if (!fbi->screen_base)
-		return -ENOMEM;
-
-	dev_dbg(sfb->dev, "mapped %x to %p\n",
-		(unsigned int)map_dma, fbi->screen_base);
-
-	memset(fbi->screen_base, 0x0, size);
-#endif
 	fbi->fix.smem_start = map_dma;
 
 	return 0;
 
-#ifdef CONFIG_ION_EXYNOS
 err_map:
 	dma_buf_put(buf);
 err_share_dma_buf:
 	ion_free(sfb->fb_ion_client, handle);
 	return -ENOMEM;
-#endif
 }
 
 /**
@@ -2391,16 +2364,7 @@ err_share_dma_buf:
  */
 static void s3c_fb_free_memory(struct s3c_fb *sfb, struct s3c_fb_win *win)
 {
-#if defined(CONFIG_ION_EXYNOS)
 	s3c_fb_free_dma_buf(sfb, &win->dma_buf_data);
-#else
-	struct fb_info *fbi = win->fbinfo;
-
-	if (fbi->screen_base)
-		dma_free_writecombine(sfb->dev, PAGE_ALIGN(fbi->fix.smem_len),
-			      fbi->screen_base, fbi->fix.smem_start);
-#endif
-
 }
 
 /**
@@ -2629,7 +2593,6 @@ static ssize_t s3c_fb_vsync_show(struct device *dev,
 
 static DEVICE_ATTR(vsync, S_IRUGO, s3c_fb_vsync_show, NULL);
 
-#ifdef CONFIG_ION_EXYNOS
 int s3c_fb_sysmmu_fault_handler(struct device *dev,
 		enum exynos_sysmmu_inttype itype, unsigned long pgtable_base,
 		unsigned long fault_addr)
@@ -2709,7 +2672,6 @@ static int __devinit s3c_fb_clear_fb(struct s3c_fb *sfb,
 	dma_buf_end_cpu_access(dest_buf, 0, size, DMA_TO_DEVICE);
 	return 0;
 }
-#endif
 
 #ifdef CONFIG_DEBUG_FS
 
@@ -2843,7 +2805,6 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
 	if (ret)
 		dev_warn(dev, "failed to initialize debugfs entry\n");
 
-#ifdef CONFIG_ION_EXYNOS
 	INIT_LIST_HEAD(&sfb->update_regs_list);
 	mutex_init(&sfb->update_regs_list_lock);
 	init_kthread_worker(&sfb->update_regs_worker);
@@ -2861,7 +2822,6 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
 	sfb->timeline = sw_sync_timeline_create("s3c-fb");
 	sfb->timeline_max = 1;
 	/* XXX need to cleanup on errors */
-#endif
 
 	sfb->bus_clk = clk_get(dev, "lcd");
 	if (IS_ERR(sfb->bus_clk)) {
@@ -2945,7 +2905,6 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
 		writel(0xffffff, regs + WKEYCON0);
 		writel(0xffffff, regs + WKEYCON1);
 	}
-#ifdef CONFIG_ION_EXYNOS
 	sfb->fb_ion_client = ion_client_create(ion_exynos, "fimd");
 	if (IS_ERR(sfb->fb_ion_client)) {
 		dev_err(sfb->dev, "failed to ion_client_create\n");
@@ -2956,7 +2915,6 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
 	platform_set_sysmmu(&SYSMMU_PLATDEV(fimd1).dev, &s5p_device_fimd1.dev);
 	exynos_sysmmu_set_fault_handler(&s5p_device_fimd1.dev,
 			s3c_fb_sysmmu_fault_handler);
-#endif
 
 	default_win = sfb->pdata->default_win;
 	for (win = 0; win < fbdrv->variant.nr_windows; win++) {
@@ -3014,7 +2972,6 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
 		sfb->vsync_info.thread = NULL;
 	}
 
-#ifdef CONFIG_ION_EXYNOS
 	ret = s3c_fb_copy_bootloader_fb(pdev,
 			sfb->windows[default_win]->dma_buf_data.dma_buf);
 	if (ret < 0) {
@@ -3023,18 +2980,15 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
 		s3c_fb_clear_fb(sfb, win->dma_buf_data.dma_buf,
 				PAGE_ALIGN(win->fbinfo->fix.smem_len));
 	}
-#endif
 
 	s3c_fb_set_par(sfb->windows[default_win]->fbinfo);
 
-#ifdef CONFIG_ION_EXYNOS
 	s3c_fb_wait_for_vsync(sfb, 0);
 	ret = iovmm_activate(&s5p_device_fimd1.dev);
 	if (ret < 0) {
 		dev_err(sfb->dev, "failed to activate vmm\n");
 		goto err_iovmm;
 	}
-#endif
 
 	if (!sfb->fb_mif_handle) {
 		sfb->fb_mif_handle = exynos5_bus_mif_min(300000);
@@ -3093,9 +3047,7 @@ err_bus_clk:
 	clk_put(sfb->bus_clk);
 
 err_sfb:
-#ifdef CONFIG_ION_EXYNOS
 	kthread_stop(sfb->update_regs_thread);
-#endif
 	return ret;
 }
 
@@ -3185,9 +3137,7 @@ static int s3c_fb_disable(struct s3c_fb *sfb)
 		clk_disable(sfb->lcd_clk);
 
 	clk_disable(sfb->bus_clk);
-#ifdef CONFIG_ION_EXYNOS
 	iovmm_deactivate(&s5p_device_fimd1.dev);
-#endif
 
 	pm_runtime_put_sync(sfb->dev);
 	sfb->output_on = false;
@@ -3250,13 +3200,11 @@ static int s3c_fb_enable(struct s3c_fb *sfb)
 		s3c_fb_enable_irq(sfb);
 	mutex_unlock(&sfb->vsync_info.irq_lock);
 
-#ifdef CONFIG_ION_EXYNOS
 	ret = iovmm_activate(&s5p_device_fimd1.dev);
 	if (ret < 0) {
 		dev_err(sfb->dev, "failed to reactivate vmm\n");
 		goto err;
 	}
-#endif
 
 #ifdef CONFIG_S5P_DP
 	writel(DPCLKCON_ENABLE, sfb->regs + DPCLKCON);
