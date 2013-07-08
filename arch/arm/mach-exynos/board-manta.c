@@ -69,7 +69,7 @@
 
 static int manta_hw_rev;
 phys_addr_t manta_bootloader_fb_start;
-phys_addr_t manta_bootloader_fb_size = 2560 * 1600 * 4;
+phys_addr_t manta_bootloader_fb_size = PAGE_ALIGN(2560 * 1601 * 4);
 static bool manta_charger_mode;
 static void __iomem *manta_cpu0_debug;
 static void __iomem *manta_cpu1_debug;
