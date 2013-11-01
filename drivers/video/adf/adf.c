@@ -453,6 +453,23 @@ void adf_hotplug_notify_disconnected(struct adf_interface *intf)
 }
 EXPORT_SYMBOL(adf_hotplug_notify_disconnected);
 
+int adf_new_id(void *ptr, struct idr *idr)
+{
+	int err, id;
+
+	do {
+		err = idr_pre_get(idr, GFP_KERNEL);
+		if (!err)
+			return -ENOMEM;
+
+		err = idr_get_new(idr, ptr, &id);
+	} while (err == -EAGAIN);
+
+	if (err < 0)
+		return err;
+	return id;
+}
+
 static int adf_obj_init(struct adf_obj *obj, enum adf_obj_type type,
 		struct idr *idr, struct adf_device *parent,
 		const struct adf_obj_ops *ops, const char *fmt, va_list args)
@@ -465,7 +482,7 @@ static int adf_obj_init(struct adf_obj *obj, enum adf_obj_type type,
 		return -EINVAL;
 	}
 
-	ret = idr_alloc(idr, obj, 0, 0, GFP_KERNEL);
+	ret = adf_new_id(obj, idr);
 	if (ret < 0) {
 		pr_err("%s: allocating object id failed: %d\n", __func__, ret);
 		return ret;

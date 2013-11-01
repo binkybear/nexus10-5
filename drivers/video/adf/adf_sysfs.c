@@ -107,7 +107,7 @@ static struct device_attribute adf_interface_attrs[] = {
 
 int adf_obj_sysfs_init(struct adf_obj *obj, struct device *parent)
 {
-	int ret = idr_alloc(&adf_minors, obj, 0, 0, GFP_KERNEL);
+	int ret = adf_new_id(obj, &adf_minors);
 	if (ret < 0) {
 		pr_err("%s: allocating adf minor failed: %d\n", __func__,
 				ret);
@@ -133,15 +133,13 @@ err_device_register:
 	return ret;
 }
 
-static char *adf_device_devnode(struct device *dev, umode_t *mode,
-		kuid_t *uid, kgid_t *gid)
+static char *adf_device_devnode(struct device *dev, umode_t *mode)
 {
 	struct adf_obj *obj = container_of(dev, struct adf_obj, dev);
 	return kasprintf(GFP_KERNEL, "adf%d", obj->id);
 }
 
-static char *adf_interface_devnode(struct device *dev, umode_t *mode,
-		kuid_t *uid, kgid_t *gid)
+static char *adf_interface_devnode(struct device *dev, umode_t *mode)
 {
 	struct adf_obj *obj = container_of(dev, struct adf_obj, dev);
 	struct adf_interface *intf = adf_obj_to_interface(obj);
@@ -150,8 +148,7 @@ static char *adf_interface_devnode(struct device *dev, umode_t *mode,
 			parent->base.id, intf->base.id);
 }
 
-static char *adf_overlay_engine_devnode(struct device *dev, umode_t *mode,
-		kuid_t *uid, kgid_t *gid)
+static char *adf_overlay_engine_devnode(struct device *dev, umode_t *mode)
 {
 	struct adf_obj *obj = container_of(dev, struct adf_obj, dev);
 	struct adf_overlay_engine *eng = adf_obj_to_overlay_engine(obj);

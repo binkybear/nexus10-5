@@ -68,4 +68,6 @@ static inline int adf_device_detach_op(struct adf_device *dev,
 	return dev->ops->detach(dev, eng, intf);
 }
 
+int adf_new_id(void *ptr, struct idr *idr);
+
 #endif /* __VIDEO_ADF_ADF_H */
