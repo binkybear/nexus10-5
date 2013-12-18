@@ -221,6 +221,7 @@ struct s3c_fb {
 	struct adf_device base;
 	struct adf_overlay_engine eng;
 	struct adf_interface intf;
+	struct adf_fbdev fbdev;
 
 	spinlock_t		slock;
 	struct device		*dev;
@@ -1306,6 +1307,9 @@ static int __devinit s3c_fb_export_bootloader_logo(struct s3c_fb *sfb,
 	struct dma_buf *dma_buf;
 	int ret = 0;
 
+	if (IS_ENABLED(CONFIG_FRAMEBUFFER_CONSOLE))
+		return -ENODEV;
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (!res || !res->start || !resource_size(res)) {
 		dev_warn(&pdev->dev, "failed to find bootloader framebuffer\n");
@@ -1369,6 +1373,21 @@ static const struct adf_interface_ops s3c_fb_intf_ops = {
 	.describe_simple_post = s3c_fb_describe_simple_post,
 	.modeset = s3c_fb_modeset,
 	.screen_size = s3c_fb_screen_size,
+};
+
+static struct fb_ops s3c_fb_ops = {
+	.owner = THIS_MODULE,
+
+	.fb_open = adf_fbdev_open,
+	.fb_release = adf_fbdev_release,
+	.fb_check_var = adf_fbdev_check_var,
+	.fb_set_par = adf_fbdev_set_par,
+	.fb_blank = adf_fbdev_blank,
+	.fb_pan_display = adf_fbdev_pan_display,
+	.fb_fillrect = cfb_fillrect,
+	.fb_copyarea = cfb_copyarea,
+	.fb_imageblit = cfb_imageblit,
+	.fb_mmap = adf_fbdev_mmap,
 };
 
 #ifdef CONFIG_DEBUG_FS
@@ -1465,6 +1484,7 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct drm_mode_modeinfo panel_mode;
 	struct adf_buffer bootloader_logo;
+	struct s3c_fb_pd_win *windata;
 	int win;
 	int default_win;
 	int ret = 0;
@@ -1690,6 +1710,13 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
 			dev_err(sfb->dev, "failed to request min_freq for int \n");
 	}
 
+	windata = sfb->windows[default_win]->windata;
+	ret = adf_fbdev_init(&sfb->fbdev, &sfb->intf, &sfb->eng,
+			windata->virtual_x, windata->virtual_y,
+			DRM_FORMAT_RGBX8888, &s3c_fb_ops, "%s", dev_name(dev));
+	if (ret < 0)
+		goto err_attachment_init;
+
 	dev_info(sfb->dev, "window %d: fb %s\n", default_win,
 			sfb->base.base.name);
 
@@ -1739,6 +1766,7 @@ static int __devexit s3c_fb_remove(struct platform_device *pdev)
 
 	pm_runtime_get_sync(sfb->dev);
 
+	adf_fbdev_destroy(&sfb->fbdev);
 	adf_interface_destroy(&sfb->intf);
 	adf_overlay_engine_destroy(&sfb->eng);
 	adf_device_destroy(&sfb->base);
