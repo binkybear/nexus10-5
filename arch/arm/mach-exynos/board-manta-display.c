@@ -102,8 +102,14 @@ static void manta_lcd_set_power(struct plat_lcd_data *pd,
 		manta_lcd_off();
 }
 
+static int manta_lcd_match_fb(struct plat_lcd_data *pd, struct fb_info *info)
+{
+	return 1;
+}
+
 static struct plat_lcd_data manta_lcd_data = {
 	.set_power	= manta_lcd_set_power,
+	.match_fb	= manta_lcd_match_fb,
 };
 
 static struct platform_device manta_lcd = {

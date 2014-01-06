@@ -595,6 +595,16 @@ static int s3c_fb_blank(struct adf_interface *intf, u8 dpms_state)
 
 	pm_runtime_put_sync(sfb->dev);
 
+	if (ret == 0) {
+		struct fb_event event;
+		int fb_state = (dpms_state == DRM_MODE_DPMS_OFF) ?
+				FB_BLANK_POWERDOWN : FB_BLANK_UNBLANK;
+
+		event.info = NULL;
+		event.data = &fb_state;
+		fb_notifier_call_chain(FB_EVENT_BLANK, &event);
+	}
+
 	return ret;
 }
 
