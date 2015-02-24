@@ -180,6 +180,8 @@ static int reset_fifo_itg(struct iio_dev *indio_dev)
 	result = inv_i2c_single_write(st, reg->user_ctrl, 0);
 	if (result)
 		goto reset_fifo_fail;
+	/* clear timestamp kfifo */
+	inv_clear_kfifo(st);
 
 	if (st->chip_config.dmp_on) {
 		val = (BIT_FIFO_RST | BIT_DMP_RST);
@@ -204,8 +206,10 @@ static int reset_fifo_itg(struct iio_dev *indio_dev)
 		if (st->chip_config.compass_enable) {
 			/* I2C_MST_DLY is set according to sample rate,
 			   slow down the power*/
-			data = st->chip_config.fifo_rate /
-				st->chip_config.dmp_output_rate;
+			data = max(COMPASS_RATE_SCALE *
+					st->chip_config.fifo_rate / ONE_K_HZ,
+					st->chip_config.fifo_rate /
+					st->chip_config.dmp_output_rate);
 			if (data > 0)
 				data -= 1;
 			result = inv_i2c_single_write(st, REG_I2C_SLV4_CTRL,
@@ -260,6 +264,8 @@ static int reset_fifo_itg(struct iio_dev *indio_dev)
 	}
 	return 0;
 reset_fifo_fail:
+	/* clear timestamp kfifo */
+	inv_clear_kfifo(st);
 	if (st->chip_config.dmp_on)
 		val = BIT_DMP_INT_EN;
 	else
@@ -609,7 +615,7 @@ static int inv_report_gyro_accl_compass(struct iio_dev *indio_dev,
 			compass_divider = st->compass_dmp_divider;
 		else
 			compass_divider = st->compass_divider;
-		if (compass_divider == st->compass_counter) {
+		if (compass_divider <= st->compass_counter) {
 			/*read from external sensor data register */
 			result = inv_i2c_read(st, REG_EXT_SENS_DATA_00,
 					      NUM_BYTES_COMPASS_SLAVE, d);
