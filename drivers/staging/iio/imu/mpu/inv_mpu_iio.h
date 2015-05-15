@@ -791,6 +791,7 @@ int inv_hw_self_test(struct inv_mpu_iio_s *st);
 int inv_hw_self_test_6500(struct inv_mpu_iio_s *st);
 void inv_recover_setting(struct inv_mpu_iio_s *st);
 s64 get_time_ns(void);
+void inv_clear_kfifo(struct inv_mpu_iio_s *st);
 
 #define mem_w(a, b, c) mpu_memory_write(st->sl_handle,\
 			st->i2c_addr, a, b, c)
